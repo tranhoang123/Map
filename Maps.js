@@ -8,8 +8,11 @@ import {
   Button,
   ActivityIndicator,
   Image,
+  ScrollView,
+  TouchableOpacity
 } from 'react-native'
 import { StackNavigator } from "react-navigation";
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 type Props = {};
 function urlForQueryAndPage(value, lat, long) {
   const data = {
@@ -24,6 +27,14 @@ function urlForQueryAndPage(value, lat, long) {
   const querystring = Object.keys(data).map(key => key + '=' + encodeURIComponent(data[key])).join('&');
 
   return 'https://api.foursquare.com/v2/venues/search?' + querystring;
+}
+function urlForQueryAndPage1(value) {
+  const data = {
+    key:'AIzaSyBIhGaLJ_2wWY0jeO6GXlq4IunT9oN6-nI',
+    input: value,
+  };
+  const querystring = Object.keys(data).map(key => key + '=' + encodeURIComponent(data[key])).join('&');
+  return 'https://maps.googleapis.com/maps/api/place/queryautocomplete/json?' + querystring;
 }
 export default class MapTest extends Component {
   static navigationOptions = {
@@ -42,10 +53,12 @@ export default class MapTest extends Component {
       error:null,
       searchString:"",
       message:"",
+      location: [],
     }
     //this.goDetail = this.goDetail.bind(this);
   }
-  componentDidMount() {
+
+  componentDidMount = () =>  {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         this.setState({
@@ -74,6 +87,18 @@ export default class MapTest extends Component {
         message: 'Có gì đó sai sai ' + error
    }));
   }
+  _executeQuery1 = (query) =>{
+      console.log(query);
+    // this.setState({isLoading:true});
+    fetch(query)
+    .then(response => response.json())
+    .then(json => this._handleResponse1(json.status, json.predictions))
+    .catch(error =>
+      this.setState({
+        //isLoading: false,
+        message: 'Có gì đó sai sai ' + error
+   }));
+ };
   _handleResponse = (meta, venues) => {
     //this.setState({isLoading:false, message:""});
     // console.log(meta.code);
@@ -94,10 +119,22 @@ export default class MapTest extends Component {
        this.setState({message: "Không xác định được vị trí, thử lại."});
     }
   };
+  _handleResponse1 = (status, predictions) => {
+    console.log(typeof status);
+    console.log(predictions);
+    if(status === "OK"){
+      this.setState({ location : predictions })
+    }
+    else {
+      console.log("Co loi xay ra");
+    }
+  };
   _onSearchTextChanged = (event) =>{
     //console.log("_onSearchTextChanged");
     this.setState({searchString: event.nativeEvent.text});
     //console.log("Current: "+this.state.searchString+", Next"+event.nativeEvent.text);
+    const query = urlForQueryAndPage1(this.state.searchString);
+    this._executeQuery1(query);
   }
   onRegionChangeComplete(data){
     this.setState({
@@ -121,13 +158,40 @@ export default class MapTest extends Component {
     this._executeQuery(query);
 
   };
-  onPress(data){
-    console.log(data.nativeEvent.coordinate.latitude);
-  }
+  _onPress = (item) => {
+    console.log(item);
+    this.setState({ searchString: item.structured_formatting.main_text})
+    console.log(this.state.searchString);
+  };
   _goDetail(data){
     this.props.navigation.navigate('Details',{detail:{data}});
   }
-  renderMarker(data){
+  _displayInfo = ()=>{
+    const {location, searchString} = this.state;
+    // view = [];
+    console.log("in ra location "+location);
+    if(location.length === 0 || searchString ===''){
+      return;
+    }
+    else {
+      view = [];
+      location.forEach((item, index) => {
+        console.log("item thu "+index+" la "+ item);
+        view.push(
+          <TouchableOpacity
+          key={item.id}
+          style={styles.touch}
+          onPress={ () => this._onPress(item) }>
+            <Text >
+              {item.structured_formatting.main_text}
+            </Text>
+          </TouchableOpacity>
+      );
+    })
+      return view;
+    }
+  };
+  renderMarker = (data) => {
     //console.log(typeof data);
     if(data !== undefined){
       //console.log("chay den day roi ne");
@@ -142,7 +206,7 @@ export default class MapTest extends Component {
             key={1}
         />
       )
-      data.forEach(function(item, index){
+      data.forEach((item, index) => {
         markers.push(
           <MapView.Marker
               coordinate={{
@@ -156,7 +220,7 @@ export default class MapTest extends Component {
               description={item.location.address}
               key={item.id}
           >
-          <MapView.Callout onPress={function(){
+          <MapView.Callout onPress={() => {
             //console.log("đã nhấn "+JSON.stringify(item));
             navigate("Details", { detail : item });
             //console.log("đã chuyển dữ liệu")
@@ -185,22 +249,26 @@ export default class MapTest extends Component {
         style={styles.map}
         region={this.state.region}
         onRegionChangeComplete={this.onRegionChangeComplete.bind(this)}
-        // onPress={this.onPress.bind(this)}
       >
         {this.renderMarker(this.state.data)}
         </MapView>
       <View style={styles.flowRight}>
-        <TextInput
+      <View style={styles.comtainer1}>
+      <TextInput
           style={styles.searchInput}
           value={this.state.searchString}
           onChange={this._onSearchTextChanged}
           underlineColorAndroid={'transparent'}
           placeholder='Search'/>
-        <Button
-          onPress={this._onSearchPressed}
-          color='#48BBEC'
-          title="Tìm"
-          />
+          <Button
+            onPress={this._onSearchPressed}
+            color='#48BBEC'
+            title="Tìm"
+            />
+      <ScrollView>
+            {this._displayInfo()}
+      </ScrollView>
+      </View>
         </View>
       </View>
     )
@@ -218,7 +286,7 @@ const styles = StyleSheet.create({
   },
   searchInput:{
     "height":36,
-    //"width":1,
+    "width": 250,
     "padding":4,
     "marginBottom":10,
     "flexGrow":1,
@@ -228,5 +296,54 @@ const styles = StyleSheet.create({
     "borderRadius":30,
     "color":"#48BBEC",
     "backgroundColor":"#fff"
+  },
+  touch:{
+    borderWidth: 1,
+    borderRadius: 5,
+    width: '100%',
+    height: 30,
+    backgroundColor: '#fff',
+  },
+  container1: {
+    backgroundColor: '#F5FCFF',
+    flex: 1,
+    paddingTop: 25
+  },
+  autocompleteContainer: {
+    flex: 1,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 1
+  },
+  descriptionContainer: {
+    // `backgroundColor` needs to be set otherwise the
+    // autocomplete input will disappear on text input.
+    backgroundColor: '#F5FCFF',
+    marginTop: 25
+  },
+  itemText: {
+    fontSize: 15,
+    margin: 2,
+  },
+  infoText: {
+    textAlign: 'center'
+  },
+  titleText: {
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 10,
+    marginTop: 10,
+    textAlign: 'center'
+  },
+  directorText: {
+    color: 'grey',
+    fontSize: 12,
+    marginBottom: 10,
+    textAlign: 'center'
+  },
+  openingText: {
+    textAlign: 'center'
   }
 })
