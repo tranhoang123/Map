@@ -12,7 +12,6 @@ import {
   TouchableOpacity
 } from 'react-native'
 import { StackNavigator } from "react-navigation";
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 type Props = {};
 function urlForQueryAndPage(value, lat, long) {
   const data = {
